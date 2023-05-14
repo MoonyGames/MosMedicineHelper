@@ -4,6 +4,26 @@ conn = sqlite3.connect('database/db.db', check_same_thread=False)
 cursor = conn.cursor()
 
 
+def select_rows_with_values_hospitals(table_name, is_taken_value, hospital_name_value):
+    cursor.execute(f"SELECT * FROM {table_name} WHERE is_taken = ? AND hospital_name = ?",
+                   (is_taken_value, hospital_name_value))
+    rows = cursor.fetchall()
+    return rows
+
+
+def update_column_value(table, column, new_value, year, month, day, time, hospital_address):
+    cursor.execute(f"UPDATE {table} SET {column} = ? WHERE year = ? AND month = ? AND day = ? AND time = ? AND "
+                   f"hospital_address = ?", (new_value, year, month, day, time, hospital_address))
+    conn.commit()
+
+
+def select_rows_with_values_receipts(table_name, patient_id):
+    query = f"SELECT * FROM {table_name} WHERE patient = ?"
+    cursor.execute(query, (patient_id,))
+    rows = cursor.fetchall()
+    return rows
+
+
 def get_row_count(table_name):
     cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
     row_count = cursor.fetchone()[0]
@@ -89,11 +109,14 @@ def db_find_val_receipt_time(receipt_hospital_name: str, current_receipt_time: d
     row = cursor.fetchone()
 
     if row is not None:
+        current_receipt_time['id'] = row[0]
         current_receipt_time['year'] = row[1]
         current_receipt_time['month'] = row[2]
         current_receipt_time['day'] = row[3]
-        current_receipt_time['is_taken'] = row[4]
-        current_receipt_time['hospital_name'] = row[5]
+        current_receipt_time['time'] = row[4]
+        current_receipt_time['is_taken'] = row[5]
+        current_receipt_time['hospital_name'] = row[6]
+        current_receipt_time['hospital_address'] = row[7]
 
         return True
     else:
