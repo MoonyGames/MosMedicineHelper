@@ -1,6 +1,8 @@
 from os import getenv
 
 import telebot
+from telebot import types
+
 from handlers import db
 
 TOKEN = getenv('BOT_TOKEN') if (getenv('BOT_TOKEN') is not None) else open('tokens.txt', 'r').readline().strip()
@@ -12,6 +14,7 @@ policy_number = 0
 is_registered = False
 
 current_user = {'user_id': None, 'name': None, 'surname': None, 'patronymic': None, 'policy_number': None}
+current_hospital = {'hospital_name': None, 'hospital_address': None}
 
 
 @bot.message_handler(commands=['start'])
@@ -21,20 +24,32 @@ def start_message(message):
 
     current_user['user_id'] = message.from_user.id
 
-    if db.db_find_val(current_user.get('user_id'), current_user):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    registration_button = types.KeyboardButton("Регистрация ✏️")
+    markup.add(registration_button)
+
+    markup1 = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    hospital_list_button = types.KeyboardButton("Выбор больницы 🏥️")
+    markup1.add(hospital_list_button)
+
+    if db.db_find_val_patients(current_user.get('user_id'), current_user):
         is_registered = True
 
-        bot.send_message(message.chat.id, 'Добро пожаловать, {}!'.format(current_user.get('name')))
+        bot.send_message(message.chat.id, 'Добро пожаловать, {}!'.format(current_user.get('name')), reply_markup=markup1)
+        bot.register_next_step_handler(message, show_addresses)
     else:
         is_registered = False
 
-        bot.send_message(message.chat.id, 'Добро пожаловать!')
+        bot.send_message(message.chat.id, 'Добро пожаловать!', reply_markup=markup)
 
 
 @bot.message_handler(content_types=['text'])
+# region Registration
 def start(message):
-    if message.text == '/reg':
-        bot.send_message(message.from_user.id, "Введите ваше ФИО: ")
+    a = types.ReplyKeyboardRemove()
+    if message.text == 'Регистрация ✏️':
+
+        bot.send_message(message.from_user.id, "Введите ваше ФИО: ", reply_markup=a)
         bot.register_next_step_handler(message, get_name)
 
 
@@ -65,11 +80,33 @@ def get_policy_number(message):
 
     current_user['policy_number'] = policy_number
 
-    db.db_save_val(user_id=current_user.get('user_id'), user_name=current_user.get('name'),
-                   user_surname=current_user.get('surname'),
-                   user_patronymic=current_user.get('patronymic'), policy_number=current_user.get('policy_number'))
+    db.db_save_val_patients(user_id=current_user.get('user_id'), user_name=current_user.get('name'),
+                            user_surname=current_user.get('surname'),
+                            user_patronymic=current_user.get('patronymic'),
+                            policy_number=current_user.get('policy_number'))
+
+    del (full_name, policy_number)
 
     bot.send_message(message.from_user.id, 'Регистрация окончена!')
+
+    bot.register_next_step_handler(message, show_addresses)
+
+
+# endregion
+
+def show_addresses(message):
+    a = types.ReplyKeyboardRemove()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+
+    buttons = []
+
+    values = db.get_column_values('hospitals', 'hospital_name')
+
+    for i in range(0, db.get_row_count('hospitals')):
+        buttons.append(types.KeyboardButton(f'🏥 {values[i]}'))
+        markup.add(buttons[i])
+
+    bot.send_message(message.from_user.id, "Выберите больницу: ", reply_markup=markup)
 
 
 bot.polling(none_stop=True)
